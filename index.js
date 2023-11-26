@@ -23,6 +23,7 @@ async function run() {
   try {
     await client.connect();
     const UserCollection = client.db("BloodDonation").collection("Users");
+    const DonatedBloodCollection = client.db('BloodDonation').collection('DonatedBlood')
     // JWT API
     app.post("/jwt", async (req, res) => {
       const user = req.body;
@@ -79,7 +80,13 @@ async function run() {
       res.send({ admin });
     });
 
-    app.post("/users", verifyToken ,verifyAdmin, async (req, res) => {
+app.post('/bloodDonation',async(req,res)=>{
+  const bloodDonation = req.body;
+  const result = await DonatedBloodCollection.insertOne(bloodDonation)
+  res.send(result)
+})
+
+    app.post("/users",  async (req, res) => {
       try {
         const user = req.body;
         const query = { email: user.email };
@@ -89,7 +96,7 @@ async function run() {
           return res.send({ message: "user already exists", insertedId: null });
         }
         const result = await UserCollection.insertOne(user);
-        res.json({ insertedId: result.insertedId }); 
+        res.json({ insertedId: result.insertedId}); 
       } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Internal Server Error" });
