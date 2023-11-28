@@ -23,8 +23,14 @@ async function run() {
   try {
     await client.connect();
     const UserCollection = client.db("BloodDonation").collection("Users");
-    const DonatedBloodCollection = client.db('BloodDonation').collection('DonatedBlood')
-    // JWT API
+    const DonatedBloodCollection = client
+      .db("BloodDonation")
+      .collection("DonatedBlood");
+      const blogsCollection = client.db('BloodDonation').collection('Blogs')
+
+  
+
+      // jwt apply
     app.post("/jwt", async (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
@@ -49,23 +55,30 @@ async function run() {
       });
     };
 
-    const verifyAdmin = async (req,res,next)=>{
+    const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
-      const query = {email : email}
+      const query = { email: email };
       const user = await UserCollection.findOne(query);
-      const isAdmin = user?.role === 'admin';
-      if(!isAdmin){
-        return res.status(403).send({message:'forbidden access'})
+      const isAdmin = user?.role === "admin";
+      if (!isAdmin) {
+        return res.status(403).send({ message: "forbidden access" });
       }
       next();
-    }
+    };
     // For all users Admin DashBoard
-    app.get("/users", verifyToken, verifyAdmin ,async (req, res) => {
+    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       console.log(req.headers);
       const query = req.body;
       const result = await UserCollection.find(query).toArray();
       res.send(result);
     });
+    app.get("/Blogs", async (req, res) => {
+      console.log(req.headers);
+      const query = req.body;
+      const result = await blogsCollection.find(query).toArray();
+      res.send(result);
+    });
+
     app.get("/users/admin/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       if (email !== req.decoded.email) {
@@ -80,14 +93,44 @@ async function run() {
       res.send({ admin });
     });
 
-app.post('/bloodDonation',async(req,res)=>{
-  const bloodDonation = req.body;
-  const result = await DonatedBloodCollection.insertOne(bloodDonation)
-  res.send(result)
-})
+    app.get('/users/admin/:email',verifyToken, async (req,res)=>{
+      const email = req.params.email;
+      const query = {email : email}
+      const result= UserCollection.findOne(query)
+      res.send(result)
+    })
 
-    app.post("/users",  async (req, res) => {
+    
+    app.post("/bloodDonation", async (req, res) => {
+      const bloodDonation = req.body;
+      const result = await DonatedBloodCollection.insertOne(bloodDonation);
+      res.send(result);
+    });
+    app.post("/Blogs", async (req, res) => {
+      const Blogs = req.body;
+      const result = await blogsCollection.insertOne(Blogs);
+      res.send(result);
+    });
+
+    app.get("/bloodDonation/:email", async (req, res) => {
+      const userEmail = req.params.email;
+
       try {
+        // Assuming 'email' is a field in your 'DonatedBloodCollection'
+        const query = { email: userEmail };
+
+        // Find all blood donation records for the given email
+        const result = await DonatedBloodCollection.find(query).toArray();
+
+        res.json(result);
+      } catch (error) {
+        console.error("Error fetching blood donation data:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
+
+    app.post("/users", async (req, res) => {
+     
         const user = req.body;
         const query = { email: user.email };
         const existingUser = await UserCollection.findOne(query);
@@ -96,31 +139,33 @@ app.post('/bloodDonation',async(req,res)=>{
           return res.send({ message: "user already exists", insertedId: null });
         }
         const result = await UserCollection.insertOne(user);
-        res.json({ insertedId: result.insertedId}); 
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Internal Server Error" });
-      }
+        res.json({ insertedId: result.insertedId });
+     
     });
 
-    app.delete("/users/:id",verifyToken,verifyAdmin, async (req, res) => {
+    app.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await UserCollection.deleteOne(query);
       res.send(result);
     });
 
-    app.patch("/users/admin/:id", verifyToken,verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: {
-          role: "admin",
-        },
-      };
-      const result = await UserCollection.updateOne(filter, updateDoc);
-      res.send(result);
-    });
+    app.patch(
+      "/users/admin/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: {
+            role: "admin",
+          },
+        };
+        const result = await UserCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      }
+    );
 
     await client.db("admin").command({ ping: 1 });
     console.log("Connected to MongoDB!");
