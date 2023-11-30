@@ -1,13 +1,18 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 5000;
 
-app.use(cors());
-app.use(express.json()); // Add this line to parse JSON requests
+app.use(cors({
+  origin:['https://blood-donation-6d88f.web.app'],credentials:true,
+}));
+app.use(express.json()); 
+app.use(cookieParser());
+// Add this line to parse JSON requests
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@try-myself.0cjln25.mongodb.net/?retryWrites=true&w=majority`;
 
@@ -21,16 +26,16 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     const UserCollection = client.db("BloodDonation").collection("Users");
     const DonatedBloodCollection = client
       .db("BloodDonation")
       .collection("DonatedBlood");
-      const blogsCollection = client.db('BloodDonation').collection('Blogs')
+    const blogsCollection = client.db("BloodDonation").collection("Blogs");
+    const DistrictsCollection = client.db('BloodDonation').collection('Districts')
+    const UpzilasCollection = client.db('BloodDonation').collection('upzilas')
 
-  
-
-      // jwt apply
+    // jwt apply
     app.post("/jwt", async (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
@@ -72,6 +77,13 @@ async function run() {
       const result = await UserCollection.find(query).toArray();
       res.send(result);
     });
+    app.get("/districs", verifyToken, async (req, res) => {
+      console.log(req.headers);
+      const query = req.body;
+      const result = await DistrictsCollection.find(query).toArray();
+      res.send(result);
+    });
+
     app.get("/Blogs", async (req, res) => {
       console.log(req.headers);
       const query = req.body;
@@ -93,19 +105,35 @@ async function run() {
       res.send({ admin });
     });
 
-    app.get('/users/admin/:email',verifyToken, async (req,res)=>{
+    app.get("/users/admin/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
-      const query = {email : email}
-      const result= UserCollection.findOne(query)
-      res.send(result)
-    })
+      const query = { email: email };
+      const result = UserCollection.findOne(query);
+      res.send(result);
+    });
 
-    
+    app.get("/bloodDonation", async (req, res) => {
+      try {
+        const query = {};
+
+        if (req.query.bloodGroup) {
+          query.bloodGroup = req.query.bloodGroup;
+        }
+
+        const result = await DonatedBloodCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error("Error fetching blood donation data:", error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
+
     app.post("/bloodDonation", async (req, res) => {
       const bloodDonation = req.body;
       const result = await DonatedBloodCollection.insertOne(bloodDonation);
       res.send(result);
     });
+
     app.post("/Blogs", async (req, res) => {
       const Blogs = req.body;
       const result = await blogsCollection.insertOne(Blogs);
@@ -116,10 +144,8 @@ async function run() {
       const userEmail = req.params.email;
 
       try {
-        // Assuming 'email' is a field in your 'DonatedBloodCollection'
         const query = { email: userEmail };
 
-        // Find all blood donation records for the given email
         const result = await DonatedBloodCollection.find(query).toArray();
 
         res.json(result);
@@ -130,17 +156,15 @@ async function run() {
     });
 
     app.post("/users", async (req, res) => {
-     
-        const user = req.body;
-        const query = { email: user.email };
-        const existingUser = await UserCollection.findOne(query);
+      const user = req.body;
+      const query = { email: user.email };
+      const existingUser = await UserCollection.findOne(query);
 
-        if (existingUser) {
-          return res.send({ message: "user already exists", insertedId: null });
-        }
-        const result = await UserCollection.insertOne(user);
-        res.json({ insertedId: result.insertedId });
-     
+      if (existingUser) {
+        return res.send({ message: "user already exists", insertedId: null });
+      }
+      const result = await UserCollection.insertOne(user);
+      res.json({ insertedId: result.insertedId });
     });
 
     app.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
@@ -167,7 +191,7 @@ async function run() {
       }
     );
 
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log("Connected to MongoDB!");
   } finally {
     // Ensure that the client will close when you finish/error
