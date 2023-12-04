@@ -6,8 +6,17 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 5000;
-
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+     'https://blood-donation-6d88f.web.app',
+    
+      
+      
+    ],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@try-myself.0cjln25.mongodb.net/?retryWrites=true&w=majority`;
@@ -67,8 +76,9 @@ async function run() {
       }
       next();
     };
+  
     // For all users Admin DashBoard
-    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/users", verifyToken, async (req, res) => {
       console.log(req.headers);
       const query = req.body;
       const result = await UserCollection.find(query).toArray();
@@ -183,11 +193,14 @@ async function run() {
       async (req, res) => {
         const id = req.params.id;
         const filter = { _id: new ObjectId(id) };
+
+        // Use a single $set operation to set the role based on the request payload
         const updateDoc = {
           $set: {
-            role: "admin",
+            role: req.body.role, // Assuming the role is passed in the request body
           },
         };
+
         const result = await UserCollection.updateOne(filter, updateDoc);
         res.send(result);
       }
@@ -202,8 +215,7 @@ async function run() {
         }
 
         const result = await DonatedBloodCollection.find(query)
-          .sort({ date: -1 })
-          .toArray();
+        .toArray();
 
         res.send(result);
       } catch (error) {
@@ -212,12 +224,10 @@ async function run() {
       }
     });
 
-
-    app.get("/bloodDonation", verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/bloodDonation", verifyToken, verifyAdmin , async (req, res) => {
       try {
         const query = {};
-        const result = await DonatedBloodCollection.find(query)
-          .toArray();
+        const result = await DonatedBloodCollection.find(query).toArray();
         res.send(result);
       } catch (error) {
         console.error("Error fetching blood donation data:", error);
